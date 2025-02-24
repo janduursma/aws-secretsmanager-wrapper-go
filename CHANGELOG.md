@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+### [1.0.1](https://github.com/janduursma/aws-secretsmanager-wrapper-go/compare/v1.0.0...v1.0.1) (2025-02-24)
+
+
+### Bug Fixes
+
+* remove logger wrapper dependency ([496d501](https://github.com/janduursma/aws-secretsmanager-wrapper-go/commit/496d5012ff76dacc19d6be05eda202f754894848))
+
 ## 1.0.0 (2025-02-24)
 
 
