@@ -1,8 +1,7 @@
 // Package secretsmanager provides a wrapper for AWS Secrets Manager.
-// It retrieves a JSON-encoded dictionary of secrets, caches individual key–value pairs
-// (with each value encrypted via AWS KMS), and supports live secret rotation via a watcher.
-// Built-in retry logic and error handling ensure robust secret retrieval, while a unified API
-// abstracts away provider-specific details.
+// It retrieves a JSON-encoded dictionary of secrets, caches individual key–value pairs encrypted with KMS,
+// and by default sets a cacheTTL of 10 minutes. It supports live secret rotation via a watcher,
+// and contains built-in retry logic.
 package secretsmanager
 
 import (
@@ -16,7 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
-	logger "github.com/janduursma/zap-logger-wrapper"
 )
 
 // defaultCacheTTL is the default time-to-live for cached secrets.
@@ -41,7 +39,6 @@ type SecretsManager struct {
 	secretName string
 	kmsKeyID   string
 
-	log *logger.Logger
 	ctx context.Context
 
 	secretsManagerClient Client
@@ -89,13 +86,12 @@ func WithKMSClient(client KMSClient) Option {
 }
 
 // NewSecretsManager creates a new SecretsManager.
-func NewSecretsManager(region, secretName, kmsKeyID string, log *logger.Logger, opts ...Option) (*SecretsManager, error) {
+func NewSecretsManager(region, secretName, kmsKeyID string, opts ...Option) (*SecretsManager, error) {
 	ctx := context.Background()
 
 	// Load AWS config.
 	cfg, err := config.LoadDefaultConfig(ctx, config.WithRegion(region))
 	if err != nil {
-		log.Error(ctx, "failed to load AWS config", err)
 		return nil, err
 	}
 
@@ -107,7 +103,6 @@ func NewSecretsManager(region, secretName, kmsKeyID string, log *logger.Logger, 
 		region:               region,
 		secretName:           secretName,
 		kmsKeyID:             kmsKeyID,
-		log:                  log,
 		ctx:                  ctx,
 		secretsManagerClient: defaultSecretsManagerClient,
 		kmsClient:            defaultKMSClient,
@@ -142,7 +137,6 @@ func (s *SecretsManager) retry(operation func() (map[string]string, error)) (map
 			delay = s.maxDelay
 		}
 	}
-	s.log.Error(s.ctx, fmt.Sprintf("operation failed after %d attempts", s.maxAttempts), lastErr)
 	return nil, lastErr
 }
 
@@ -159,12 +153,10 @@ func (s *SecretsManager) fetchSecrets() (map[string]string, error) {
 		if out.SecretString == nil || *out.SecretString == "" {
 			errString := fmt.Sprintf("secret %q is nil or empty", s.secretName)
 			err = errors.New(errString)
-			s.log.Error(s.ctx, errString, err)
 			return nil, err
 		}
 		var result map[string]string
 		if err := json.Unmarshal([]byte(*out.SecretString), &result); err != nil {
-			s.log.Error(s.ctx, "failed to unmarshal secret JSON", err)
 			return nil, err
 		}
 		return result, nil
@@ -181,11 +173,10 @@ func (s *SecretsManager) Get(key string) (string, error) {
 	if cs, ok := s.cache[key]; ok && time.Since(cs.fetchedAt) < s.cacheTTL {
 		s.cacheLock.RUnlock()
 		// Decrypt the cached value.
-		plaintext, err := DecryptValue(context.Background(), s.log, s.kmsClient, cs.encryptedValue)
+		plaintext, err := DecryptValue(context.Background(), s.kmsClient, cs.encryptedValue)
 		if err != nil {
 			errString := fmt.Sprintf("failed to decrypt cached value for %s", key)
 			err = errors.New(errString)
-			s.log.Error(s.ctx, errString, err)
 			return "", err
 		}
 		return plaintext, nil
@@ -195,7 +186,6 @@ func (s *SecretsManager) Get(key string) (string, error) {
 	// Cache miss: fetch the entire secret from AWS.
 	secretsMap, err := s.fetchSecrets()
 	if err != nil {
-		s.log.Error(s.ctx, "failed to fetch secrets", err)
 		return "", err
 	}
 
@@ -204,9 +194,8 @@ func (s *SecretsManager) Get(key string) (string, error) {
 	defer s.cacheLock.Unlock()
 	for k, v := range secretsMap {
 		// Encrypt the value using KMS.
-		enc, err := EncryptValue(context.Background(), s.log, s.kmsClient, s.kmsKeyID, v)
+		enc, err := EncryptValue(context.Background(), s.kmsClient, s.kmsKeyID, v)
 		if err != nil {
-			s.log.Error(s.ctx, fmt.Sprintf("failed to encrypt secret %s", k), err)
 			return "", err
 		}
 		s.cache[k] = cachedSecret{
@@ -220,12 +209,10 @@ func (s *SecretsManager) Get(key string) (string, error) {
 	if !ok {
 		errString := fmt.Sprintf("%s: secret not found", key)
 		err = errors.New(errString)
-		s.log.Error(s.ctx, errString, err)
 		return "", err
 	}
-	plaintext, err := DecryptValue(context.Background(), s.log, s.kmsClient, cs.encryptedValue)
+	plaintext, err := DecryptValue(context.Background(), s.kmsClient, cs.encryptedValue)
 	if err != nil {
-		s.log.Error(s.ctx, fmt.Sprintf("failed to decrypt secret %s", key), err)
 		return "", err
 	}
 	return plaintext, nil
@@ -238,7 +225,6 @@ func (s *SecretsManager) Watch(ctx context.Context, key string, interval time.Du
 		// Perform an initial fetch and set lastVal.
 		lastVal, err := s.Get(key)
 		if err != nil {
-			s.log.Error(s.ctx, fmt.Sprintf("initial fetch failed for key %s", key), err)
 			return
 		}
 
@@ -251,7 +237,6 @@ func (s *SecretsManager) Watch(ctx context.Context, key string, interval time.Du
 			case <-ticker.C:
 				val, err := s.Get(key)
 				if err != nil {
-					s.log.Error(s.ctx, fmt.Sprintf("watch error for key %s", key), err)
 					continue
 				}
 				if val != lastVal {

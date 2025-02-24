@@ -51,6 +51,11 @@ The package requires several AWS-specific environment variables to be set, or to
 - **AWS_SECRET_ID:** The AWS access key part of your credentials.
 - **AWS_SECRET_ACCESS_KEY:** The AWS secret access key part of your credentials.
 
+This secrets manager wrapper uses functional options to allow you to customize its behavior. By default, it is configured as follows:
+- **Cache TTL:** 10 minutes  
+  The default cacheTTL is set to `10 minutes`. You can override this using the `WithCacheTTL` option.
+
+
 ---
 
 ## Usage
@@ -61,37 +66,21 @@ Below is a simple example that demonstrates how to use the package in a service:
 package main
 
 import (
-	"context"
 	"log"
 	"time"
 	
 	secretsmanager "github.com/janduursma/aws-secretsmanager-wrapper-go"
-	logger "github.com/janduursma/zap-logger-wrapper"
-	"go.uber.org/zap"
 )
 
 func main() {
-	// See: github.com/janduursma/zap-logger-wrapper for logger setup.
-	traceFn := func(ctx context.Context) string { return "fake-trace-id" }
-
-	l, err := logger.New("my-service", traceFn, zap.InfoLevel)
-	if err != nil {
-		log.Fatalf("failed to create logger: %v", err)
-	}
-
-	ctx := context.Background()
-
-	// Create AWS Secrets Manager with custom cacheTTL.
-	secretManager, err := secretsmanager.NewSecretsManager("us-west-2", "my-secret-id", "my-kms-key-id", l, secretsmanager.WithCacheTTL(30*time.Minute))
+	// Create AWS Secrets Manager with custom cacheTTL of 30 minutes.
+	secretManager, err := secretsmanager.NewSecretsManager("us-west-2", "my-secret-id", "my-kms-key-id", secretsmanager.WithCacheTTL(30*time.Minute))
 	if err != nil {
 		log.Fatalf("failed to create AWS Secrets Manager: %v", err)
 	}
 
 	// Now use the secrets manager:
 	_, err = secretManager.Get("DB_PASSWORD")
-	if err != nil {
-		l.Error(ctx, "failed to get secret")
-	}
 }
 ```
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -13,9 +12,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/kms"
 	awsSecretsManager "github.com/aws/aws-sdk-go-v2/service/secretsmanager"
 	secretsmanagerWrapper "github.com/janduursma/aws-secretsmanager-wrapper-go"
-	logger "github.com/janduursma/zap-logger-wrapper"
 	"github.com/stretchr/testify/require"
-	"go.uber.org/zap"
 )
 
 // --- MOCKS ---
@@ -81,17 +78,8 @@ func (m *mockKMSClientEncryptFailure) Decrypt(_ context.Context, _ *kms.DecryptI
 // newSecretsManagerForTest creates a SecretsManager using the provided mock clients
 // and a custom cache TTL.
 func newSecretsManagerForTest(t *testing.T, sm secretsmanagerWrapper.Client, kms secretsmanagerWrapper.KMSClient, cacheTTL time.Duration) *secretsmanagerWrapper.SecretsManager {
-	// Define a trace function that returns a fake trace ID.
-	traceFn := func(_ context.Context) string { return "fake-trace-id" }
-
-	// Create a logger
-	l, err := logger.New("testSecretsManager", traceFn, zap.InfoLevel)
-	if err != nil {
-		log.Fatalf("failed to create logger: %v", err)
-	}
-
 	// Create the SecretsManager
-	secretsManager, err := secretsmanagerWrapper.NewSecretsManager("us-test-1", "test-secret", "test-kms-key", l, secretsmanagerWrapper.WithSecretsManagerClient(sm), secretsmanagerWrapper.WithKMSClient(kms), secretsmanagerWrapper.WithCacheTTL(cacheTTL))
+	secretsManager, err := secretsmanagerWrapper.NewSecretsManager("us-test-1", "test-secret", "test-kms-key", secretsmanagerWrapper.WithSecretsManagerClient(sm), secretsmanagerWrapper.WithKMSClient(kms), secretsmanagerWrapper.WithCacheTTL(cacheTTL))
 	require.NoError(t, err)
 
 	return secretsManager
@@ -294,16 +282,12 @@ func TestSecretsManager_Watch(t *testing.T) {
 func TestDecryptValue_InvalidBase64(t *testing.T) {
 	ctx := context.Background()
 
-	traceFn := func(_ context.Context) string { return "test-trace-id" }
-	l, err := logger.New("test", traceFn, zap.InfoLevel)
-	require.NoError(t, err)
-
 	kmsClient := &mockKMSClient{}
 
 	// Pass an invalid base64 string so that decoding fails.
 	invalidCiphertext := "not_base64"
 
-	plaintext, err := secretsmanagerWrapper.DecryptValue(ctx, l, kmsClient, invalidCiphertext)
+	plaintext, err := secretsmanagerWrapper.DecryptValue(ctx, kmsClient, invalidCiphertext)
 	require.Error(t, err)
 	require.Empty(t, plaintext)
 }
