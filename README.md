@@ -3,7 +3,7 @@
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Go Report Card](https://goreportcard.com/badge/github.com/janduursma/aws-secretsmanager-wrapper-go)](https://goreportcard.com/report/github.com/janduursma/aws-secretsmanager-wrapper-go)
 [![semantic-release](https://img.shields.io/badge/semantic--release-ready-brightgreen)](https://github.com/go-semantic-release/go-semantic-release)
-[![codecov](https://codecov.io/gh/janduursma/aws-secretsmanager-wrapper-go/graph/badge.svg?token=NA24AOA3EN)](https://codecov.io/gh/janduursma/aws-secretsmanager-wrapper-go)
+[![codecov](https://codecov.io/gh/janduursma/aws-secretsmanager-wrapper-go/graph/badge.svg?token=LBQGOP14WJ)](https://codecov.io/gh/janduursma/aws-secretsmanager-wrapper-go)
 
 The AWS Secrets Manager Wrapper is designed to simplify secrets management in AWS. It wraps the official AWS Secrets Manager caching library and extends its functionality with:
 
