@@ -3,7 +3,7 @@ module github.com/janduursma/aws-secretsmanager-wrapper-go
 go 1.24.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.36.2
+	github.com/aws/aws-sdk-go-v2 v1.36.3
 	github.com/aws/aws-sdk-go-v2/config v1.29.7
 	github.com/aws/aws-sdk-go-v2/service/kms v1.37.19
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.34.19
